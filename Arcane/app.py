@@ -3,6 +3,7 @@ import requests
 from geopy.geocoders import Nominatim
 import pymysql
 import pandas as pd
+import numpy as np
 
 def get_connection():
     timeout = 10
@@ -22,18 +23,72 @@ def get_connection():
 
 def get_weather_data(coords):
     lat, lon = coords
-    url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&hourly=precipitation,temperature_2m&daily=precipitation_sum&timezone=auto"
-    response = requests.get(url)
+    # Current weather and forecast for the next 16 days
+    forecast_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto&forecast=16"
+    response = requests.get(forecast_url)
+    
     if response.status_code == 200:
-        data = response.json()
-        current_temp = data['current_weather']['temperature']
-        hourly_precip = data['hourly']['precipitation']
-        recent_rainfall = next((val for val in reversed(hourly_precip) if val > 0), 0)
-        yearly_precip = sum(data['daily']['precipitation_sum'])
+        forecast_data = response.json()
+        daily_max_temps = forecast_data['daily']['temperature_2m_max']
+        daily_min_temps = forecast_data['daily']['temperature_2m_min']
+        daily_precipitation = forecast_data['daily']['precipitation_sum']
+        
+        # Get current weather
+        current_temp_url = f"https://api.open-meteo.com/v1/current?latitude={lat}&longitude={lon}&current_weather=true"
+        current_response = requests.get(current_temp_url)
+        
+        if current_response.status_code == 200:
+            current_weather = current_response.json()
+            current_temp = current_weather['current_weather']['temperature']
+        else:
+            current_temp = None
+        
+        return current_temp, daily_max_temps, daily_min_temps, daily_precipitation
+    else:
+        return None, None, None, None
 
-        return current_temp, recent_rainfall, yearly_precip
+def get_historical_weather_data(coords):
+    lat, lon = coords
+    historical_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&past_days=90&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto"
+    response = requests.get(historical_url)
+
+    if response.status_code == 200:
+        historical_data = response.json()
+        historical_max_temps = historical_data['daily']['temperature_2m_max']
+        historical_min_temps = historical_data['daily']['temperature_2m_min']
+        historical_precipitation = historical_data['daily']['precipitation_sum']
+        return historical_max_temps, historical_min_temps, historical_precipitation
     else:
         return None, None, None
+
+def forecast_weather(coords):
+    # Get historical weather data for the past three months
+    historical_max, historical_min, historical_precip = get_historical_weather_data(coords)
+    
+    # Get current and forecast weather data
+    current_temp, forecast_max, forecast_min, forecast_precip = get_weather_data(coords)
+
+    # Simulate monthly weather conditions
+    monthly_forecast = []
+    
+    # Calculate average monthly values based on past historical data and forecast
+    if historical_max and historical_min and historical_precip and forecast_max and forecast_min and forecast_precip:
+        # Combine historical and forecast data to create a smooth forecast
+        for month in range(12):
+            if month < 3:  # For the first 3 months, use historical data
+                avg_max = np.mean(historical_max[-30 * (3 - month):])  # Get last 30 days of each month
+                avg_min = np.mean(historical_min[-30 * (3 - month):])
+                avg_precip = np.mean(historical_precip[-30 * (3 - month):])
+            else:  # For the next months, use forecast data
+                avg_max = np.mean(forecast_max[max(0, month - 3):month + 1])  # Take an average for a smooth transition
+                avg_min = np.mean(forecast_min[max(0, month - 3):month + 1])
+                avg_precip = np.mean(forecast_prec[max(0, month - 3):month + 1])
+
+            monthly_forecast.append((avg_max, avg_min, avg_precip))
+
+        return monthly_forecast
+    else:
+        return None
 
 def get_soils():
     conn = get_connection()
@@ -107,6 +162,31 @@ def calculate_score(profitability, risk_of_failure):
         return 0  # No viable crop if the risk is too high
     return profitability / (1 + risk_of_failure)  # Score calculation
 
+def best_planting_cycle(filtered_crops, monthly_forecast):
+    planting_schedule = []
+    month = 0  # Start from the first month
+    while month < 12:
+        crop_scores = []
+        
+        for crop in filtered_crops:
+            avg_temp = (monthly_forecast[month][0] + monthly_forecast[month][1]) / 2  # Average temperature for the month
+            avg_precip = monthly_forecast[month][2]  # Average precipitation for the month
+            profitability = calculate_profitability(crop, avg_temp, avg_precip)
+            risk_of_failure = calculate_risk_of_failure(crop, avg_temp, avg_precip)
+            score = calculate_score(profitability, risk_of_failure)
+            crop_scores.append((crop['name'], score, crop['harvest_time']))
+
+        # Sort crops by score
+        crop_scores.sort(key=lambda x: x[1], reverse=True)
+
+        # Select the best crop for the month
+        if crop_scores:
+            best_crop = crop_scores[0]
+            planting_schedule.append((best_crop[0], month + 1))  # Store the crop name and month
+            month += best_crop[2]  # Move to the next available month based on harvest time
+
+    return planting_schedule
+
 def main():
     st.title("Farm Profitability Maximizer")
     
@@ -118,11 +198,12 @@ def main():
         coords = geolocator.geocode(location)
         if coords:
             st.write(f"Location found: {coords.address}")
-            current_temp, recent_rainfall, yearly_rainfall = get_weather_data((coords.latitude, coords.longitude))
-            if current_temp is not None:
-                st.write(f"Current temperature: {current_temp}°C")
-                st.write(f"Recent rainfall: {recent_rainfall} mm")
-                st.write(f"Yearly rainfall estimate: {yearly_rainfall} mm")
+            monthly_forecast = forecast_weather((coords.latitude, coords.longitude))
+            if monthly_forecast is not None:
+                current_temp = monthly_forecast[0][0]  # Use first month temp for current temp
+                st.write("Monthly Weather Forecast:")
+                for month, (max_temp, min_temp, precip) in enumerate(monthly_forecast):
+                    st.write(f"Month {month + 1}: Max Temp: {max_temp:.2f}°C, Min Temp: {min_temp:.2f}°C, Precipitation: {precip:.2f} mm")
             else:
                 st.warning("Could not retrieve weather data.")
         else:
@@ -142,8 +223,8 @@ def main():
                 
                 # Calculate profitability, risk, and score for each crop
                 for crop in filtered_crops:
-                    profitability = calculate_profitability(crop, current_temp, yearly_rainfall)
-                    risk_of_failure = calculate_risk_of_failure(crop, current_temp, yearly_rainfall)
+                    profitability = calculate_profitability(crop, current_temp, monthly_forecast[0][2])  # Using first month precip
+                    risk_of_failure = calculate_risk_of_failure(crop, current_temp, monthly_forecast[0][2])
                     score = calculate_score(profitability, risk_of_failure)
                     crops_with_scores.append((crop, profitability, risk_of_failure, score))
                 
@@ -165,6 +246,14 @@ def main():
                         f"Risk of Failure: {risk:.2f} | "
                         f"Score: {score:.2f}"
                     )
+                
+                # Calculate and display the best planting cycle
+                if st.button("Calculate Best Planting Cycle"):
+                    planting_schedule = best_planting_cycle(filtered_crops, monthly_forecast)
+                    st.subheader("Best Planting Cycle")
+                    for crop_name, month in planting_schedule:
+                        st.write(f"**Plant {crop_name} in Month {month}**")
+                
             else:
                 st.info("No crops found for the selected soil type.")
     else:
