@@ -1,0 +1,5 @@
+# Arcane
+streamlit
+mysql.connector
+requests
+geopy
