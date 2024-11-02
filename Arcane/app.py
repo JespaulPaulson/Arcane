@@ -2,17 +2,13 @@ import streamlit as st
 import mysql.connector
 import requests
 from geopy.geocoders import Nominatim
-import toml
-
-# Load the configuration from the toml file
-config = toml.load('Arcane/login.toml')
 
 def create_connection():
     conn = mysql.connector.connect(
-        db_host = config['database']['DB_HOST'],
-        db_user = config['database']['DB_USER'],
-        db_password = config['database']['DB_PASSWORD'],
-        db_name = config['database']['DB_NAME']
+        db_host = '127.0.0.1',
+        db_user = 'root',
+        db_password = '1234',
+        db_name = 'farm'
     )
     return conn
 
