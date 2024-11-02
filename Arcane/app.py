@@ -2,13 +2,17 @@ import streamlit as st
 import mysql.connector
 import requests
 from geopy.geocoders import Nominatim
+import toml
+
+# Load the configuration from the toml file
+config = toml.load('login.toml')
 
 def create_connection():
     conn = mysql.connector.connect(
-        host = st.secrets.database.DB_HOST,
-        user = st.secrets.database.DB_USER,
-        password = st.secrets.database.DB_PASSWORD,
-        database = st.secrets.database.DB_NAME
+        db_host = config['database']['DB_HOST'],
+        db_user = config['database']['DB_USER'],
+        db_password = config['database']['DB_PASSWORD'],
+        db_name = config['database']['DB_NAME']
     )
     return conn
 
