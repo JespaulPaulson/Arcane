@@ -5,7 +5,7 @@ from geopy.geocoders import Nominatim
 import toml
 
 # Load the configuration from the toml file
-config = toml.load('login.toml')
+config = toml.load('Arcane/login.toml')
 
 def create_connection():
     conn = mysql.connector.connect(
