@@ -51,24 +51,25 @@ def filter_crops_by_soil(soil_type):
     return filter_crops
 
 def display_filtered_crops():
-    if st.button("Get Crop Information"):
-        for crop in filtered_crops:
-            st.subheader(f"Crop: {crop[0]}")
-            st.write(
-                f"Soil Type: {crop[1]} | "
-                f"Min Temp (°C): {crop[2]} | "
-                f"Max Temp (°C): {crop[3]} | "
-                f"Min Rainfall (mm): {crop[4]} | "
-                f"Max Rainfall (mm): {crop[5]} | "
-                f"Harvest Time (days): {crop[6]} | "
-                f"Spoil Time (days): {crop[7]}"
-            )
+    for crop in filtered_crops:
+        st.subheader(f"Crop: {crop[0]}")
+        st.write(
+            f"Soil Type: {crop[1]} | "
+            f"Min Temp (°C): {crop[2]} | "
+            f"Max Temp (°C): {crop[3]} | "
+            f"Min Rainfall (mm): {crop[4]} | "
+            f"Max Rainfall (mm): {crop[5]} | "
+            f"Harvest Time (days): {crop[6]} | "
+            f"Spoil Time (days): {crop[7]}"
+        )
 
 st.title("Farm Profitability Maximizer")
 location = st.text_input("Enter your location:")
 geolocator = Nominatim(user_agent="farmer.io")
 coords = geolocator.geocode(location)
-soil_type = st.selectbox("Select your soil type:", options = get_soils())    
+soils = get_soils()
+soil_type = st.selectbox("Select your soil type:", options = soils)    
 filtered_crops = filter_crops_by_soil(soil_type)
 
-display_filtered_crops()
+if st.button("Get Crop Information"):
+    display_filtered_crops()
