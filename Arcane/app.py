@@ -67,15 +67,15 @@ def main():
 
     # Display information for each crop
     for crop in filtered_crops:
-        st.subheader(f"Crop: {crop['name']}")
+        st.subheader(f"Crop: {crop[0]}")
         st.write(
-            f"**Soil Type:** {crop['soil_type']} | "
-            f"**Min Temp (°C):** {crop['min_temp']} | "
-            f"**Max Temp (°C):** {crop['max_temp']} | "
-            f"**Min Rainfall (mm):** {crop['min_rainfall']} | "
-            f"**Max Rainfall (mm):** {crop['max_rainfall']} | "
-            f"**Harvest Time (days):** {crop['harvest_time']} | "
-            f"**Spoil Time (days):** {crop['spoil_time']}"
+            f"Soil Type: {crop[1]} | "
+            f"Min Temp (°C): {crop[2]} | "
+            f"Max Temp (°C): {crop[3]} | "
+            f"Min Rainfall (mm): {crop[4]} | "
+            f"Max Rainfall (mm): {crop[5]} | "
+            f"Harvest Time (days): {crop[6]} | "
+            f"Spoil Time (days): {crop[7]}"
         )
 
 if __name__ == "__main__":
