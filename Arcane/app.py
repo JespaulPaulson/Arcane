@@ -61,6 +61,8 @@ def main():
    
     soil_type = st.selectbox("Select your soil type:", options = get_soils())
 
+    filtered_crops = []
+
     if st.button("Get Crop Information"):
         
         # Filter crops by soil type
@@ -68,18 +70,18 @@ def main():
 
         #profitable_crops = list_crops_by_profitability(filtered_crops)
 
-    # Display information for each crop
-    for crop in filtered_crops:
-        st.subheader(f"Crop: {crop[0]}")
-        st.write(
-            f"Soil Type: {crop[1]} | "
-            f"Min Temp (°C): {crop[2]} | "
-            f"Max Temp (°C): {crop[3]} | "
-            f"Min Rainfall (mm): {crop[4]} | "
-            f"Max Rainfall (mm): {crop[5]} | "
-            f"Harvest Time (days): {crop[6]} | "
-            f"Spoil Time (days): {crop[7]}"
-        )
+        # Display information for each crop
+        for crop in filtered_crops:
+            st.subheader(f"Crop: {crop[0]}")
+            st.write(
+                f"Soil Type: {crop[1]} | "
+                f"Min Temp (°C): {crop[2]} | "
+                f"Max Temp (°C): {crop[3]} | "
+                f"Min Rainfall (mm): {crop[4]} | "
+                f"Max Rainfall (mm): {crop[5]} | "
+                f"Harvest Time (days): {crop[6]} | "
+                f"Spoil Time (days): {crop[7]}"
+            )
 
 if __name__ == "__main__":
     main()
