@@ -22,26 +22,24 @@ def get_weather_data(coords):
         return None
 
 def get_soils():
-    conn = create_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT DISTINCT soil_type FROM crops")
     s = [ x[0] for x in cursor.fetchall() ]
     cursor.close()
-    conn.close()
     return s
 
 def filter_crops_by_soil(soil_type):
-    conn = create_connection()
     cursor = conn.cursor()
     cursor.execute(f"SELECT * FROM crops WHERE soil_type = {soil_type}")
     filter_crops = cursor.fetchall()
     cursor.close()
-    conn.close()
     return filter_crops
 
 def main():
     st.title("Farm Profitability Maximizer")
 
+    create_connection()
+    
     # User inputs
     location = st.text_input("Enter your location:")
     geolocator = Nominatim(user_agent="farmer.io")
