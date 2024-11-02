@@ -25,7 +25,7 @@ def get_soils():
     conn = create_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT DISTINCT soil_type FROM crops")
-    s = [ x[1] for x in cursor.fetchall() ]
+    s = [ x[0] for x in cursor.fetchall() ]
     cursor.close()
     conn.close()
     return s
