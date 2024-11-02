@@ -31,7 +31,7 @@ def main():
     st.title("Farm Profitability Maximizer")
 
     timeout = 10
-    connection = pymysql.connect(
+    conn = pymysql.connect(
       charset="utf8mb4",
       connect_timeout=timeout,
       cursorclass=pymysql.cursors.DictCursor,
