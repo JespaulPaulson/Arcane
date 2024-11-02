@@ -35,35 +35,35 @@ def get_soils():
     s = cursor.fetchall()
     cursor.close()
     conn.close()
-    return s
+    soil_types = [row[0] for row in s]
+    return soil_types
 
 def filter_crops_by_soil(soil_type):
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute(f"SELECT * FROM crops WHERE soil_type = {soil_type}")
-    filter_crops = cursor.fetchall()
+    cursor.execute("SELECT * FROM crops WHERE soil_type = %s", (soil_type,))
+    crops = cursor.fetchall()
     cursor.close()
     conn.close()
+    
+    # Convert each tuple in filter_crops to a list
+    filter_crops = [list(row) for row in crops]
     return filter_crops
 
 def main():
     st.title("Farm Profitability Maximizer")
-    
-    filtered_crops = []
-    soil_types = []
-    soil_types.append(get_soils())
 
     # User inputs
     location = st.text_input("Enter your location:")
     geolocator = Nominatim(user_agent="farmer.io")
     coords = geolocator.geocode(location)
    
-    soil_type = st.selectbox("Select your soil type:", options = soil_types)
+    soil_type = st.selectbox("Select your soil type:", options = get_soils())
 
     if st.button("Get Crop Information"):
         
         # Filter crops by soil type
-        filtered_crops.append(filter_crops_by_soil(soil_type))
+        filtered_crops = filter_crops_by_soil(soil_type)
 
         #profitable_crops = list_crops_by_profitability(filtered_crops)
 
