@@ -4,32 +4,7 @@ import requests
 from geopy.geocoders import Nominatim
 import pymysql
 
-def get_weather_data(coords):
-    lat, lon = coords
-    url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true"
-    response = requests.get(url)
-    if response.status_code == 200:
-        return response.json()
-    else:
-        return None
-
-def get_soils():
-    cursor = conn.cursor()
-    cursor.execute("SELECT DISTINCT soil_type FROM crops")
-    s = [ x[0] for x in cursor.fetchall() ]
-    cursor.close()
-    return s
-
-def filter_crops_by_soil(soil_type):
-    cursor = conn.cursor()
-    cursor.execute(f"SELECT * FROM crops WHERE soil_type = {soil_type}")
-    filter_crops = cursor.fetchall()
-    cursor.close()
-    return filter_crops
-
-def main():
-    st.title("Farm Profitability Maximizer")
-
+def get_connection():
     timeout = 10
     conn = pymysql.connect(
       charset="utf8mb4",
@@ -43,6 +18,36 @@ def main():
       user="avnadmin",
       write_timeout=timeout,
     )
+
+def get_weather_data(coords):
+    lat, lon = coords
+    url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true"
+    response = requests.get(url)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        return None
+
+def get_soils():
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT DISTINCT soil_type FROM crops")
+    s = [ x[0] for x in cursor.fetchall() ]
+    cursor.close()
+    conn.close()
+    return s
+
+def filter_crops_by_soil(soil_type):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(f"SELECT * FROM crops WHERE soil_type = {soil_type}")
+    filter_crops = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    return filter_crops
+
+def main():
+    st.title("Farm Profitability Maximizer")
     
     # User inputs
     location = st.text_input("Enter your location:")
