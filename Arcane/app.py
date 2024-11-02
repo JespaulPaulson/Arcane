@@ -5,10 +5,10 @@ from geopy.geocoders import Nominatim
 
 def create_connection():
     conn = mysql.connector.connect(
-        db_host = '127.0.0.1',
-        db_user = 'root',
-        db_password = '1234',
-        db_name = 'farm'
+        host = '127.0.0.1',
+        user = 'root',
+        password = '1234',
+        name = 'farm'
     )
     return conn
 
