@@ -18,6 +18,7 @@ def get_connection():
       user="avnadmin",
       write_timeout=timeout,
     )
+    return conn
 
 def get_weather_data(coords):
     lat, lon = coords
