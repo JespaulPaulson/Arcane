@@ -3,15 +3,6 @@ import mysql.connector
 import requests
 from geopy.geocoders import Nominatim
 
-def create_connection():
-    conn = mysql.connector.connect(
-        host = '127.0.0.1',
-        user = 'root',
-        password = '1234',
-        name = 'farm'
-    )
-    return conn
-
 def get_weather_data(coords):
     lat, lon = coords
     url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true"
@@ -38,7 +29,12 @@ def filter_crops_by_soil(soil_type):
 def main():
     st.title("Farm Profitability Maximizer")
 
-    create_connection()
+    conn = mysql.connector.connect(
+        host = '127.0.0.1',
+        user = 'root',
+        password = '1234',
+        name = 'farm'
+    )
     
     # User inputs
     location = st.text_input("Enter your location:")
