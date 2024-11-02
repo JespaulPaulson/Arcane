@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 from geopy.geocoders import Nominatim
 import pymysql
+import pandas as pd
 
 def get_connection():
     timeout = 10
@@ -21,12 +22,18 @@ def get_connection():
 
 def get_weather_data(coords):
     lat, lon = coords
-    url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true"
+    url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&hourly=precipitation,temperature_2m&daily=precipitation_sum&timezone=auto"
     response = requests.get(url)
     if response.status_code == 200:
-        return response.json()
+        data = response.json()
+        current_temp = data['current_weather']['temperature']
+        hourly_precip = data['hourly']['precipitation']
+        recent_rainfall = next((val for val in reversed(hourly_precip) if val > 0), 0)
+        yearly_precip = sum(data['daily']['precipitation_sum'])
+
+        return current_temp, recent_rainfall, yearly_precip
     else:
-        return None
+        return None, None, None
 
 def get_soils():
     conn = get_connection()
@@ -45,40 +52,53 @@ def filter_crops_by_soil(soil_type):
     crops = cursor.fetchall()
     cursor.close()
     conn.close()
-    
-    # Convert each tuple in crops to a list
-    filter_crops = [dict(row) for row in crops]  # Use dict to access by column name
+    filter_crops = [dict(row) for row in crops]  # Convert to dict for easy access by column name
     return filter_crops
 
-def calculate_profitability(crop, current_temp, current_rainfall):
-    yield_per_acre = crop['yield_acre']
+def calculate_profitability(crop, current_temp, yearly_rainfall):
+    yield_per_acre = crop['yield_acre'] * 1000  # Convert tonnes to kg
     profit_kg = crop['profit_kg']
-    
-    # Calculate temperature and rainfall shifts based on the current weather
-    temp_shift = current_temp - ((crop['min_temp'] + crop['max_temp']) / 2)
-    rain_shift = current_rainfall - crop['max_rainfall']
+    market_price = crop['market_price']  # Market price per kg of the crop
+    cost_of_inputs = crop['cost_of_inputs']  # Cost of inputs for the crop
 
-    # Define maximum shifts for normalization
-    max_temp_shift = 10  # Max acceptable temperature shift
-    max_rain_shift = 200  # Max acceptable rainfall shift
+    median_temp = (crop['min_temp'] + crop['max_temp']) / 2
+    median_precip = (crop['min_rainfall'] + crop['max_rainfall']) / 2
 
-    # Calculate factors based on shifts
-    temp_factor = 1 - min(max(abs(temp_shift) / max_temp_shift, 0), 1)
-    rain_factor = 1 - min(max(abs(rain_shift) / max_rain_shift, 0), 1)
-    
+    # Adjustments for temperature and rainfall deviations
+    temp_dev = max(0, 1 - abs(median_temp - current_temp) / 10)  # Temperature adjustment
+    precip_dev = max(0, 1 - abs(median_precip - yearly_rainfall) / 100)  # Rainfall adjustment
+
+    # Ensure adjustments are not too severe, setting minimum adjustment values to 0.25
+    if temp_dev < 0.25:  # Minimum temperature adjustment
+        temp_dev = 0.25
+    if precip_dev < 0.25:  # Minimum rainfall adjustment
+        precip_dev = 0.25
+
+    # Adjusted yield based on environmental conditions
+    adjusted_yield = yield_per_acre * temp_dev * precip_dev
+
     # Calculate profitability
-    profitability = yield_per_acre * profit_kg * temp_factor * rain_factor
-    return profitability, calculate_risk_of_failure(temp_shift, rain_shift)
+    base_profitability = (yield_per_acre * profit_kg * market_price) - cost_of_inputs
+    adjusted_profitability = (adjusted_yield * profit_kg * market_price) - cost_of_inputs
 
-def calculate_risk_of_failure(temp_shift, rain_shift):
-    # Risk of failure scales with the degree of deviation from optimal conditions
-    max_temp_shift = 10  # Define acceptable temperature deviation
-    max_rain_shift = 200  # Define acceptable rainfall deviation
+    # Calculate maximum potential profitability for normalization
+    max_profitability = (yield_per_acre * profit_kg * market_price) - cost_of_inputs
 
-    temp_risk = min(max(abs(temp_shift) / max_temp_shift, 0), 1)
-    rain_risk = min(max(abs(rain_shift) / max_rain_shift, 0), 1)
-    
-    # Combined risk (average of temp and rain risk)
+    # Normalize the profitability to a scale of 0 to 1
+    if max_profitability > 0:
+        normalized_profitability = adjusted_profitability / max_profitability
+    else:
+        normalized_profitability = 0.0  # In case of no profit, return 0
+
+    return normalized_profitability
+
+def calculate_risk_of_failure(crop, current_temp, yearly_rainfall):
+    median_temp = (crop['min_temp'] + crop['max_temp']) / 2
+    median_precip = (crop['min_rainfall'] + crop['max_rainfall']) / 2
+
+    temp_risk = min(max(abs(median_temp - current_temp) / 10, 0), 1)
+    rain_risk = min(max(abs(median_precip - yearly_rainfall) / 100, 0), 1)
+
     risk_of_failure = (temp_risk + rain_risk) / 2
     return risk_of_failure
 
@@ -98,12 +118,11 @@ def main():
         coords = geolocator.geocode(location)
         if coords:
             st.write(f"Location found: {coords.address}")
-            weather_data = get_weather_data((coords.latitude, coords.longitude))
-            if weather_data:
-                current_temp = weather_data['current_weather']['temperature']
-                current_rainfall = weather_data.get('current_weather', {}).get('precipitation', 0)  # Adjust based on the actual API response structure
+            current_temp, recent_rainfall, yearly_rainfall = get_weather_data((coords.latitude, coords.longitude))
+            if current_temp is not None:
                 st.write(f"Current temperature: {current_temp}°C")
-                st.write(f"Current rainfall: {current_rainfall} mm")  # Make sure this key exists in the response
+                st.write(f"Recent rainfall: {recent_rainfall} mm")
+                st.write(f"Yearly rainfall estimate: {yearly_rainfall} mm")
             else:
                 st.warning("Could not retrieve weather data.")
         else:
@@ -113,8 +132,6 @@ def main():
     if soils:
         soil_type = st.selectbox("Select your soil type:", options=soils)
 
-        filtered_crops = []  # Initialize the variable
-
         if st.button("Get Crop Information"):
             # Filter crops by soil type
             filtered_crops = filter_crops_by_soil(soil_type)
@@ -123,9 +140,10 @@ def main():
             if filtered_crops:
                 crops_with_scores = []
                 
-                # Calculate profitability, risk, and score for each crop and store it with the crop details
+                # Calculate profitability, risk, and score for each crop
                 for crop in filtered_crops:
-                    profitability, risk_of_failure = calculate_profitability(crop, current_temp, current_rainfall)
+                    profitability = calculate_profitability(crop, current_temp, yearly_rainfall)
+                    risk_of_failure = calculate_risk_of_failure(crop, current_temp, yearly_rainfall)
                     score = calculate_score(profitability, risk_of_failure)
                     crops_with_scores.append((crop, profitability, risk_of_failure, score))
                 
@@ -154,7 +172,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-
