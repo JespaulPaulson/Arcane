@@ -47,8 +47,45 @@ def filter_crops_by_soil(soil_type):
     conn.close()
     
     # Convert each tuple in crops to a list
-    filter_crops = [list(row.values()) for row in crops]  # Use .values() for DictCursor
+    filter_crops = [dict(row) for row in crops]  # Use dict to access by column name
     return filter_crops
+
+def calculate_profitability(crop, current_temp, current_rainfall):
+    yield_per_acre = crop['yield_acre']
+    profit_kg = crop['profit_kg']
+    
+    # Calculate temperature and rainfall shifts based on the current weather
+    temp_shift = current_temp - ((crop['min_temp'] + crop['max_temp']) / 2)
+    rain_shift = current_rainfall - crop['max_rainfall']
+
+    # Define maximum shifts for normalization
+    max_temp_shift = 10  # Max acceptable temperature shift
+    max_rain_shift = 200  # Max acceptable rainfall shift
+
+    # Calculate factors based on shifts
+    temp_factor = 1 - min(max(abs(temp_shift) / max_temp_shift, 0), 1)
+    rain_factor = 1 - min(max(abs(rain_shift) / max_rain_shift, 0), 1)
+    
+    # Calculate profitability
+    profitability = yield_per_acre * profit_kg * temp_factor * rain_factor
+    return profitability, calculate_risk_of_failure(temp_shift, rain_shift)
+
+def calculate_risk_of_failure(temp_shift, rain_shift):
+    # Risk of failure scales with the degree of deviation from optimal conditions
+    max_temp_shift = 10  # Define acceptable temperature deviation
+    max_rain_shift = 200  # Define acceptable rainfall deviation
+
+    temp_risk = min(max(abs(temp_shift) / max_temp_shift, 0), 1)
+    rain_risk = min(max(abs(rain_shift) / max_rain_shift, 0), 1)
+    
+    # Combined risk (average of temp and rain risk)
+    risk_of_failure = (temp_risk + rain_risk) / 2
+    return risk_of_failure
+
+def calculate_score(profitability, risk_of_failure):
+    if risk_of_failure >= 1:
+        return 0  # No viable crop if the risk is too high
+    return profitability / (1 + risk_of_failure)  # Score calculation
 
 def main():
     st.title("Farm Profitability Maximizer")
@@ -63,11 +100,16 @@ def main():
             st.write(f"Location found: {coords.address}")
             weather_data = get_weather_data((coords.latitude, coords.longitude))
             if weather_data:
-                st.write(f"Current temperature: {weather_data['current_weather']['temperature']}°C")
+                current_temp = weather_data['current_weather']['temperature']
+                current_rainfall = weather_data.get('current_weather', {}).get('precipitation', 0)  # Adjust based on the actual API response structure
+                st.write(f"Current temperature: {current_temp}°C")
+                st.write(f"Current rainfall: {current_rainfall} mm")  # Make sure this key exists in the response
+            else:
+                st.warning("Could not retrieve weather data.")
         else:
             st.warning("Location not found. Please try again.")
     
-    soils = get_soils()  # Make sure to fetch soils here
+    soils = get_soils()
     if soils:
         soil_type = st.selectbox("Select your soil type:", options=soils)
 
@@ -79,16 +121,31 @@ def main():
 
             # Display information for each crop
             if filtered_crops:
+                crops_with_scores = []
+                
+                # Calculate profitability, risk, and score for each crop and store it with the crop details
                 for crop in filtered_crops:
-                    st.subheader(f"Crop: {crop[0]}")
+                    profitability, risk_of_failure = calculate_profitability(crop, current_temp, current_rainfall)
+                    score = calculate_score(profitability, risk_of_failure)
+                    crops_with_scores.append((crop, profitability, risk_of_failure, score))
+                
+                # Sort crops by score in descending order
+                crops_with_scores.sort(key=lambda x: x[3], reverse=True)
+
+                # Display sorted crops
+                for crop, profitability, risk, score in crops_with_scores:
+                    st.subheader(f"Crop: {crop['crop_name']}")
                     st.write(
-                        f"Soil Type: {crop[1]} | "
-                        f"Min Temp (°C): {crop[2]} | "
-                        f"Max Temp (°C): {crop[3]} | "
-                        f"Min Rainfall (mm): {crop[4]} | "
-                        f"Max Rainfall (mm): {crop[5]} | "
-                        f"Harvest Time (days): {crop[6]} | "
-                        f"Spoil Time (days): {crop[7]}"
+                        f"Soil Type: {crop['soil_type']} | "
+                        f"Min Temp (°C): {crop['min_temp']} | "
+                        f"Max Temp (°C): {crop['max_temp']} | "
+                        f"Min Rainfall (mm): {crop['min_rainfall']} | "
+                        f"Max Rainfall (mm): {crop['max_rainfall']} | "
+                        f"Harvest Time (days): {crop['harvest_time']} | "
+                        f"Spoil Time (days): {crop['spoil_time']} | "
+                        f"Profitability: {profitability:.2f} | "
+                        f"Risk of Failure: {risk:.2f} | "
+                        f"Score: {score:.2f}"
                     )
             else:
                 st.info("No crops found for the selected soil type.")
@@ -97,4 +154,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
 
