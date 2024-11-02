@@ -134,7 +134,7 @@ def main():
 
                 # Display sorted crops
                 for crop, profitability, risk, score in crops_with_scores:
-                    st.subheader(f"Crop: {crop['crop_name']}")
+                    st.subheader(f"Crop: {crop['name']}")
                     st.write(
                         f"Soil Type: {crop['soil_type']} | "
                         f"Min Temp (°C): {crop['min_temp']} | "
