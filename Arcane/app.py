@@ -30,10 +30,10 @@ def main():
     st.title("Farm Profitability Maximizer")
 
     conn = mysql.connector.connect(
-        host = '127.0.0.1',
-        user = 'root',
-        password = '1234',
-        name = 'farm'
+        host = 'mysql-2c95a0b8-farmer-2024.h.aivencloud.com',
+        user = 'avnadmin',
+        password = 'AVNS_v_4126KzUUG5et4Mkct',
+        name = 'defaultdb'
     )
     
     # User inputs
