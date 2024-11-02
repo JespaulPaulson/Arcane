@@ -32,7 +32,7 @@ def get_soils():
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT DISTINCT soil_type FROM crops")
-    s = [ x[0] for x in cursor.fetchall() ]
+    s = cursor.fetchall()
     cursor.close()
     conn.close()
     return s
@@ -50,13 +50,15 @@ def main():
     st.title("Farm Profitability Maximizer")
     
     filtered_crops = []
-    
+    soil_types = []
+    soil_types = get_soils()
+
     # User inputs
     location = st.text_input("Enter your location:")
     geolocator = Nominatim(user_agent="farmer.io")
     coords = geolocator.geocode(location)
    
-    soil_type = st.selectbox("Select your soil type:", options = get_soils())
+    soil_type = st.selectbox("Select your soil type:", options = soil_types)
 
     if st.button("Get Crop Information"):
         
