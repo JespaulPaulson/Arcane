@@ -2,6 +2,7 @@ import streamlit as st
 import mysql.connector
 import requests
 from geopy.geocoders import Nominatim
+import pymysql
 
 def get_weather_data(coords):
     lat, lon = coords
@@ -29,11 +30,18 @@ def filter_crops_by_soil(soil_type):
 def main():
     st.title("Farm Profitability Maximizer")
 
-    conn = mysql.connector.connect(
-        host = 'mysql-2c95a0b8-farmer-2024.h.aivencloud.com',
-        user = 'avnadmin',
-        password = 'AVNS_v_4126KzUUG5et4Mkct',
-        name = 'defaultdb'
+    timeout = 10
+    connection = pymysql.connect(
+      charset="utf8mb4",
+      connect_timeout=timeout,
+      cursorclass=pymysql.cursors.DictCursor,
+      db="defaultdb",
+      host="mysql-2c95a0b8-farmer-2024.h.aivencloud.com",
+      password="AVNS_v_4126KzUUG5et4Mkct",
+      read_timeout=timeout,
+      port=16785,
+      user="avnadmin",
+      write_timeout=timeout,
     )
     
     # User inputs
