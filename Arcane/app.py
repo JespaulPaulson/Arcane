@@ -35,7 +35,7 @@ def get_soils():
     s = cursor.fetchall()
     cursor.close()
     conn.close()
-    soil_types = [row[0] for row in s]
+    soil_types = [row['soil_type'] for row in s]
     return soil_types
 
 def filter_crops_by_soil(soil_type):
@@ -52,10 +52,9 @@ def filter_crops_by_soil(soil_type):
 
 def main():
     st.title("Farm Profitability Maximizer")
-
-    filtered_crops = []
-    # User inputs
     
+    # User inputs
+
     location = st.text_input("Enter your location:")
     geolocator = Nominatim(user_agent="farmer.io")
     coords = geolocator.geocode(location)
