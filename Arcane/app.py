@@ -51,7 +51,7 @@ def main():
     
     filtered_crops = []
     soil_types = []
-    soil_types = get_soils()
+    soil_types.append(get_soils())
 
     # User inputs
     location = st.text_input("Enter your location:")
@@ -63,7 +63,7 @@ def main():
     if st.button("Get Crop Information"):
         
         # Filter crops by soil type
-        filtered_crops = filter_crops_by_soil(soil_type)
+        filtered_crops.append(filter_crops_by_soil(soil_type))
 
         #profitable_crops = list_crops_by_profitability(filtered_crops)
 
