@@ -27,7 +27,6 @@ def get_soils():
     cursor.execute("SELECT DISTINCT soil_type FROM crops")
     s = [ x[1] for x in cursor.fetchall() ]
     cursor.close()
-    conn.close()
     return s
 
 def filter_crops_by_soil(soil_type):
@@ -36,7 +35,6 @@ def filter_crops_by_soil(soil_type):
     cursor.execute(f"SELECT * FROM crops WHERE soil_type = {soil_type}")
     filter_crops = cursor.fetchall()
     cursor.close()
-    conn.close()
     return filter_crops
 
 def main():
