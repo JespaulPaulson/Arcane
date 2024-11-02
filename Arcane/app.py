@@ -5,10 +5,10 @@ from geopy.geocoders import Nominatim
 
 def create_connection():
     conn = mysql.connector.connect(
-        host= st.secrets["database"]["DB_HOST"],
-        user= st.secrets["database"]['DB_USER'],
-        password= st.secrets["database"]['DB_PASSWORD'],
-        database= st.secrets["database"]['DB_NAME']
+        host = st.secrets.database.DB_HOST,
+        user = st.secrets.database.DB_USER,
+        password = st.secrets.database.DB_PASSWORD,
+        database = st.secrets.database.DB_NAME
     )
     return conn
 
@@ -27,6 +27,7 @@ def get_soils():
     cursor.execute("SELECT DISTINCT soil_type FROM crops")
     s = [ x[1] for x in cursor.fetchall() ]
     cursor.close()
+    conn.close()
     return s
 
 def filter_crops_by_soil(soil_type):
@@ -35,6 +36,7 @@ def filter_crops_by_soil(soil_type):
     cursor.execute(f"SELECT * FROM crops WHERE soil_type = {soil_type}")
     filter_crops = cursor.fetchall()
     cursor.close()
+    conn.close()
     return filter_crops
 
 def main():
