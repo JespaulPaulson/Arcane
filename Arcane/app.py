@@ -61,15 +61,12 @@ def main():
    
     soil_type = st.selectbox("Select your soil type:", options = get_soils())
 
-    filtered_crops = []
+    filtered_crops = []        
+    filtered_crops = filter_crops_by_soil(soil_type)
 
     if st.button("Get Crop Information"):
-        
-        # Filter crops by soil type
-        filtered_crops = filter_crops_by_soil(soil_type)
 
         #profitable_crops = list_crops_by_profitability(filtered_crops)
-
         # Display information for each crop
         for crop in filtered_crops:
             st.subheader(f"Crop: {crop[0]}")
