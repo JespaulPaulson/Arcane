@@ -55,8 +55,7 @@ def main():
     geolocator = Nominatim(user_agent="farmer.io")
     coords = geolocator.geocode(location)
    
-    soils = get_soils()
-    soil_type = st.selectbox("Select your soil type:", soils)
+    soil_type = st.selectbox("Select your soil type:", options = get_soils())
 
     if st.button("Get Crop Information"):
         
