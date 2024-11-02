@@ -1,5 +1,4 @@
 import streamlit as st
-import mysql.connector
 import requests
 from geopy.geocoders import Nominatim
 import pymysql
@@ -49,6 +48,8 @@ def filter_crops_by_soil(soil_type):
 
 def main():
     st.title("Farm Profitability Maximizer")
+    
+    filtered_crops = []
     
     # User inputs
     location = st.text_input("Enter your location:")
