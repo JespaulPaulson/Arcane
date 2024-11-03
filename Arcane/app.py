@@ -240,6 +240,9 @@ def main():
 
                     # Create Tabs for different sections
                     tab1, tab2, tab3 = st.tabs(["Crop Details", "Weather Information", "Best Planting Cycle"])
+
+                    if isinstance(crops_with_data, list):
+                        crops_with_data = pd.DataFrame(crops_with_data)
                     
                     with tab1:
                         st.subheader("Crop Details")
