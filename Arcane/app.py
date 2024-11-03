@@ -240,13 +240,10 @@ def main():
 
                     # Create Tabs for different sections
                     tab1, tab2, tab3 = st.tabs(["Crop Details", "Weather Information", "Best Planting Cycle"])
-
-                    if isinstance(crops_with_data, list):
-                        crops_with_data = pd.DataFrame(crops_with_data)
                     
                     with tab1:
                         st.subheader("Crop Details")
-                        st.table(crops_with_data)  # Display the crops data in a table format
+                        st.table(filtered_crops_with_scores)  # Display the crops data in a table format
 
                     with tab2:
                         st.subheader("Weather Information")
@@ -255,7 +252,7 @@ def main():
                     
                     with tab3:
                         st.subheader("Best Planting Cycle")
-                        best_cycle = calculate_best_planting_cycle(crops_with_data)
+                        best_cycle = calculate_best_planting_cycle(all_crops_with_data)
                         st.write(f"The best planting cycle is: {', '.join(best_cycle)}")
 
                     # Plot the graph below the other details
