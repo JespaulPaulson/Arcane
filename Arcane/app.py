@@ -252,12 +252,12 @@ def main():
                     
                     with tab3:
                         st.subheader("Best Planting Cycle")
-                        best_cycle = calculate_best_planting_cycle(all_crops_with_data)
+                        best_cycle = calculate_best_planting_cycle(filtered_crops_with_scores)
                         st.write(f"The best planting cycle is: {', '.join(best_cycle)}")
 
                     # Plot the graph below the other details
                     st.subheader("Crop Scores Graph")
-                    plot_crops_scores(crops_with_data)
+                    plot_crops_scores(all_crops_with_data)
 
     elif page == "Inventory":
         # Streamlit app starts here
