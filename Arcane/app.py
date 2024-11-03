@@ -271,7 +271,7 @@ def main():
         st.subheader("Add New Inventory Record")
         crop_name = st.text_input("Crop Name")
         quantity = st.number_input("Quantity", min_value=0)
-        unit = st.text_input("Unit")
+        unit = st.selectbox("Unit", options=["kg", "lbs"])
         cost_per_unit = st.number_input("Cost per Unit", min_value=0.0, format="%.2f")
         location = st.text_input("Location")
         notes = st.text_area("Notes")
