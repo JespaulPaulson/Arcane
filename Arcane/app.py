@@ -4,6 +4,8 @@ from geopy.geocoders import Nominatim
 import pymysql
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 def get_connection():
     timeout = 10
@@ -23,20 +25,12 @@ def get_connection():
 
 def get_weather_data(coords):
     lat, lon = coords
-    # Get current weather
-    url_current = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true"
-    response_current = requests.get(url_current)
-    
-    # Get 16-day weather forecast
-    url_forecast = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&daily=precipitation_sum&timezone=auto"
-    response_forecast = requests.get(url_forecast)
-
-    if response_current.status_code == 200 and response_forecast.status_code == 200:
-        current_data = response_current.json()
-        forecast_data = response_forecast.json()
-
-        current_temp = current_data['current_weather']['temperature']
-        yearly_precip = sum(forecast_data['daily']['precipitation_sum'])  # Summing daily precipitation for annual estimate
+    url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&daily=precipitation_sum,temperature_2m_max,temperature_2m_min&timezone=auto"
+    response = requests.get(url)
+    if response.status_code == 200:
+        data = response.json()
+        current_temp = data['current_weather']['temperature']
+        yearly_precip = sum(data['daily']['precipitation_sum'])
         return current_temp, yearly_precip
     else:
         return None, None
@@ -83,6 +77,7 @@ def calculate_profitability(crop, current_temp, yearly_rainfall):
     adjusted_yield = yield_per_acre * temp_dev * precip_dev
 
     # Calculate profitability
+    base_profitability = (yield_per_acre * profit_kg * market_price) - cost_of_inputs
     adjusted_profitability = (adjusted_yield * profit_kg * market_price) - cost_of_inputs
 
     # Calculate maximum potential profitability for normalization
@@ -122,71 +117,137 @@ def calculate_best_planting_cycle(crops_with_data):
 
     return best_cycles
 
+def load_inventory():
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM inventory")
+    inventory = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    return pd.DataFrame(inventory)
+
+# Graph plotting function with refined data handling
+import matplotlib.pyplot as plt
+
+# Updated graph plotting function
+import matplotlib.pyplot as plt
+
+def plot_graphs(crops_with_data):
+    # Convert data to DataFrame
+    df = pd.DataFrame(crops_with_data)
+
+    # Convert columns to numeric, forcing errors to NaN to avoid any data issues
+    df['Profitability'] = pd.to_numeric(df['Profitability'], errors='coerce')
+    df['Risk of Failure'] = pd.to_numeric(df['Risk of Failure'], errors='coerce')
+
+    # Filter out any rows with NaN values in Profitability or Risk of Failure
+    df = df.dropna(subset=['Profitability', 'Risk of Failure'])
+
+    if df.empty:
+        st.write("No valid data to display in graphs.")
+        return
+
+    # Plot combined line graph with shaded area
+    st.subheader("Profitability and Risk of Failure Analysis")
+    fig, ax = plt.subplots(figsize=(10, 5))
+
+    # Plot Profitability
+    ax.plot(df['Crop'], df['Profitability'], label='Profitability', color='blue', marker='o')
+    
+    # Plot Risk of Failure
+    ax.plot(df['Crop'], df['Risk of Failure'], label='Risk of Failure', color='red', marker='o')
+
+    # Fill between the two lines to show the score area
+    ax.fill_between(df['Crop'], df['Profitability'], df['Risk of Failure'], where=(df['Profitability'] > df['Risk of Failure']),
+                    color='lightgreen', alpha=0.5, label='Score Area (Profitability > Risk)')
+
+    ax.set_xlabel("Crop")
+    ax.set_ylabel("Values")
+    ax.set_title("Profitability vs Risk of Failure for Crops")
+    ax.legend()
+    plt.xticks(rotation=45)
+    st.pyplot(fig)
+
 def main():
-    st.title("Farming Profitability Maximizer")
+    st.title("Farm Profitability Maximizer")
 
-    # User inputs
-    location = st.text_input("Enter your location:")
-    geolocator = Nominatim(user_agent="farmer.io")
+    # Navigation
+    page = st.sidebar.selectbox("Select a page:", ["Home", "Inventory", "Graphs"])
 
-    if location:
-        coords = geolocator.geocode(location)
-        if coords:
-            st.write(f"Location found: {coords.address}")
-            current_temp, yearly_rainfall = get_weather_data((coords.latitude, coords.longitude))
-            if current_temp is not None:
-                st.write(f"Current temperature: {current_temp}°C")
-                st.write(f"Yearly rainfall estimate: {yearly_rainfall} mm")
-                
-                # Get soil types
-                soils = get_soils()
-                soil_type = st.selectbox("Select your soil type:", options=soils)
+    if page == "Home":
+        location = st.text_input("Enter your location:")
+        if location:
+            geolocator = Nominatim(user_agent="farmer.io")
+            coords = geolocator.geocode(location)
 
-                # Filter crops by soil type
-                filtered_crops = filter_crops_by_soil(soil_type)
+            soils = get_soils()
+            soil_type = st.selectbox("Select your soil type:", options=soils)
+            
+            if coords:
+                st.write(f"Location: {coords.address}")
+                current_temp, yearly_rainfall = get_weather_data((coords.latitude, coords.longitude))
+                if current_temp is not None:
 
-                crops_with_data = []
-                # Calculate profitability, risk, and score for each crop
-                for crop in filtered_crops:
-                    profitability = calculate_profitability(crop, current_temp, yearly_rainfall)
-                    risk_of_failure = calculate_risk_of_failure(crop, current_temp, yearly_rainfall)
-                    score = calculate_score(profitability, risk_of_failure)
+                    # Filter crops by soil type
+                    filtered_crops = filter_crops_by_soil(soil_type)
 
-                    # Only include crops with non-negative scores
-                    if score > 0:  # Changed from score >= 0 to score > 0 to exclude zero scores
-                        crops_with_data.append({
-                            'Crop': crop['name'],
-                            'Soil Type': crop['soil_type'],
-                            'Min Temp (°C)': crop['min_temp'],
-                            'Max Temp (°C)': crop['max_temp'],
-                            'Min Rainfall (mm)': crop['min_rainfall'],
-                            'Max Rainfall (mm)': crop['max_rainfall'],
-                            'Profitability': f"{profitability:.2f}",
-                            'Risk of Failure': f"{risk_of_failure:.2f}",
-                            'Score': f"{score:.2f}",
-                        })
+                    crops_with_data = []
+                    # Calculate profitability, risk, and score for each crop
+                    for crop in filtered_crops:
+                        profitability = calculate_profitability(crop, current_temp, yearly_rainfall)
+                        risk_of_failure = calculate_risk_of_failure(crop, current_temp, yearly_rainfall)
+                        score = calculate_score(profitability, risk_of_failure)
 
-                # Sort crops by score in descending order
-                crops_with_data.sort(key=lambda x: x['Score'], reverse=True)
+                        # Only include crops with non-negative scores
+                        if score > 0:  # Only include crops with positive scores
+                            crops_with_data.append({
+                                'Crop': crop['name'],
+                                'Soil Type': crop['soil_type'],
+                                'Min Temp (°C)': crop['min_temp'],
+                                'Max Temp (°C)': crop['max_temp'],
+                                'Min Rainfall (mm)': crop['min_rainfall'],
+                                'Max Rainfall (mm)': crop['max_rainfall'],
+                                'Profitability': f"{profitability:.2f}",
+                                'Risk of Failure': f"{risk_of_failure:.2f}",
+                                'Score': f"{score:.2f}",
+                            })
 
-                # Display crops in a table format
-                st.subheader("Crop Details")
-                st.table(crops_with_data)  # Display the crops data in a table format
-                
-                # Calculate the best planting cycle based on crops with the highest scores
-                best_planting_cycle = calculate_best_planting_cycle(crops_with_data)
+                    # Sort crops by score in descending order
+                    crops_with_data.sort(key=lambda x: x['Score'], reverse=True)
 
-                if best_planting_cycle:
-                    st.subheader("Best Planting Cycle")
-                    st.write(" → ".join(best_planting_cycle)) 
+                    # Create Tabs for different sections
+                    tab1, tab2, tab3 = st.tabs(["Crop Details", "Weather Information", "Best Planting Cycle"])
+                    
+                    with tab1:
+                        st.subheader("Crop Details")
+                        st.table(crops_with_data)  # Display the crops data in a table format
 
+                        # Plot the graphs below the crop details
+                        plot_graphs(crops_with_data)
+
+                    with tab2:
+                        st.subheader("Weather Information")
+                        st.write(f"Current temperature: {current_temp}°C")
+                        st.write(f"Estimated yearly rainfall: {yearly_rainfall} mm")
+                    
+                    with tab3:
+                        st.subheader("Best Planting Cycle")
+                        best_planting_cycle = calculate_best_planting_cycle(crops_with_data)
+                        st.write(" -> ".join(best_planting_cycle))  # Display the best planting cycle
+                else:
+                    st.warning("No crop data available for plotting. Please check the Home page.")
             else:
                 st.warning("Could not retrieve weather data.")
         else:
             st.warning("Location not found. Please try again.")
+    elif page == "Inventory":
+        st.subheader("Inventory Management")
+        inventory_df = load_inventory()
+        st.table(inventory_df)  # Display the inventory in a table format
 
 if __name__ == "__main__":
     main()
+
 
 
 
