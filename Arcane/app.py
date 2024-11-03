@@ -5,7 +5,6 @@ import pymysql
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
 
 def get_connection():
     timeout = 10
@@ -126,62 +125,78 @@ def load_inventory():
     conn.close()
     return pd.DataFrame(inventory)
 
-# Graph plotting function with refined data handling
-import matplotlib.pyplot as plt
+def insert_inventory_record(crop_name, quantity, unit, cost_per_unit, location, notes):
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        sql = """INSERT INTO inventory (crop_name, quantity, unit, cost_per_unit, location, notes)
+                 VALUES (%s, %s, %s, %s, %s, %s)"""
+        cursor.execute(sql, (crop_name, quantity, unit, cost_per_unit, location, notes))
+        conn.commit()  # Commit the transaction
+        st.success("Record inserted successfully!")
+    except Exception as e:
+        st.error(f"Error inserting record: {e}")
+    finally:
+        cursor.close()
+        conn.close()
 
-# Updated graph plotting function
-import matplotlib.pyplot as plt
+def delete_inventory_record(record_id):
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        sql = "DELETE FROM inventory WHERE id = %s"
+        cursor.execute(sql, (record_id,))
+        conn.commit()  # Commit the transaction
+        st.success("Record deleted successfully!")
+    except Exception as e:
+        st.error(f"Error deleting record: {e}")
+    finally:
+        cursor.close()
+        conn.close()
 
-def plot_graphs(crops_with_data):
-    # Convert data to DataFrame
+def plot_crops_scores(crops_with_data):
+    # Convert crops data to DataFrame
     df = pd.DataFrame(crops_with_data)
 
-    # Convert columns to numeric, forcing errors to NaN to avoid any data issues
-    df['Profitability'] = pd.to_numeric(df['Profitability'], errors='coerce')
-    df['Risk of Failure'] = pd.to_numeric(df['Risk of Failure'], errors='coerce')
-
-    # Filter out any rows with NaN values in Profitability or Risk of Failure
-    df = df.dropna(subset=['Profitability', 'Risk of Failure'])
+    # Filter out any rows with NaN values in Score
+    df = df.dropna(subset=['Score'])
 
     if df.empty:
-        st.write("No valid data to display in graphs.")
+        st.write("No valid data to display in graph.")
         return
 
-    # Plot combined line graph with shaded area
-    st.subheader("Profitability and Risk of Failure Analysis")
-    fig, ax = plt.subplots(figsize=(10, 5))
-
-    # Plot Profitability
-    ax.plot(df['Crop'], df['Profitability'], label='Profitability', color='blue', marker='o')
+    # Plotting scores
+    plt.figure(figsize=(10, 5))
     
-    # Plot Risk of Failure
-    ax.plot(df['Crop'], df['Risk of Failure'], label='Risk of Failure', color='red', marker='o')
+    # Plot the scores
+    plt.plot(df['Crop'], df['Score'], label='Crop Score', color='blue', marker='o')
+    
+    # Fill the area below the score line for visual representation
+    plt.fill_between(df['Crop'], df['Score'], color='lightblue', alpha=0.5)
 
-    # Fill between the two lines to show the score area
-    ax.fill_between(df['Crop'], df['Profitability'], df['Risk of Failure'], where=(df['Profitability'] > df['Risk of Failure']),
-                    color='lightgreen', alpha=0.5, label='Score Area (Profitability > Risk)')
-
-    ax.set_xlabel("Crop")
-    ax.set_ylabel("Values")
-    ax.set_title("Profitability vs Risk of Failure for Crops")
-    ax.legend()
+    plt.xlabel("Crops")
+    plt.ylabel("Score")
+    plt.title("Crop Scores by Location")
     plt.xticks(rotation=45)
-    st.pyplot(fig)
+    plt.legend()
+    plt.grid()
+    plt.tight_layout()
+    st.pyplot(plt)  # Display the plot in Streamlit
 
 def main():
     st.title("Farm Profitability Maximizer")
 
     # Navigation
-    page = st.sidebar.selectbox("Select a page:", ["Home", "Inventory", "Graphs"])
+    page = st.selectbox("Select a page:", ["Home", "Inventory"])
 
     if page == "Home":
         location = st.text_input("Enter your location:")
+        soils = get_soils()
+        soil_type = st.selectbox("Select your soil type:", options=soils)
+
         if location:
             geolocator = Nominatim(user_agent="farmer.io")
             coords = geolocator.geocode(location)
-
-            soils = get_soils()
-            soil_type = st.selectbox("Select your soil type:", options=soils)
             
             if coords:
                 st.write(f"Location: {coords.address}")
@@ -222,9 +237,6 @@ def main():
                         st.subheader("Crop Details")
                         st.table(crops_with_data)  # Display the crops data in a table format
 
-                        # Plot the graphs below the crop details
-                        plot_graphs(crops_with_data)
-
                     with tab2:
                         st.subheader("Weather Information")
                         st.write(f"Current temperature: {current_temp}°C")
@@ -232,21 +244,45 @@ def main():
                     
                     with tab3:
                         st.subheader("Best Planting Cycle")
-                        best_planting_cycle = calculate_best_planting_cycle(crops_with_data)
-                        st.write(" -> ".join(best_planting_cycle))  # Display the best planting cycle
-                else:
-                    st.warning("No crop data available for plotting. Please check the Home page.")
-            else:
-                st.warning("Could not retrieve weather data.")
-        else:
-            st.warning("Location not found. Please try again.")
+                        best_cycle = calculate_best_planting_cycle(crops_with_data)
+                        st.write(f"The best planting cycle is: {', '.join(best_cycle)}")
+
+                    # Plot the graph below the other details
+                    st.subheader("Crop Scores Graph")
+                    plot_crops_scores(crops_with_data)
+
     elif page == "Inventory":
         st.subheader("Inventory Management")
+        
+        # Display the current inventory
         inventory_df = load_inventory()
         st.table(inventory_df)  # Display the inventory in a table format
+        
+        # Insert new record form
+        st.subheader("Add New Record")
+        with st.form("insert_form", clear_on_submit=True):
+            crop_name = st.text_input("Crop Name")
+            quantity = st.number_input("Quantity", min_value=0.0)
+            unit = st.selectbox("Unit", options=["kg", "lbs", "bags"])
+            cost_per_unit = st.number_input("Cost per Unit", min_value=0.0)
+            location = st.text_input("Location")
+            notes = st.text_area("Notes")
+            
+            submitted = st.form_submit_button("Add Record")
+            if submitted:
+                insert_inventory_record(crop_name, quantity, unit, cost_per_unit, location, notes)
+                inventory_df = load_inventory()  # Refresh inventory data
+
+        # Delete record form
+        st.subheader("Delete Record")
+        record_id = st.number_input("Record ID to delete", min_value=1)
+        if st.button("Delete Record"):
+            delete_inventory_record(record_id)
+            inventory_df = load_inventory()  # Refresh inventory data
 
 if __name__ == "__main__":
     main()
+
 
 
 
