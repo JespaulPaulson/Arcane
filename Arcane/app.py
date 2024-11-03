@@ -206,32 +206,37 @@ def main():
                 current_temp, yearly_rainfall = get_weather_data((coords.latitude, coords.longitude))
                 if current_temp is not None:
 
-                    # Filter crops by soil type
-                    filtered_crops = filter_crops_by_soil(soil_type)
+                                        # Get all crops from the database
+                    filtered_crops = filter_crops_by_soil(soil_type)  # Adjusted to get all crops
 
-                    crops_with_data = []
+                    all_crops_with_data = []  # To store all crops with calculated scores
+
                     # Calculate profitability, risk, and score for each crop
                     for crop in filtered_crops:
                         profitability = calculate_profitability(crop, current_temp, yearly_rainfall)
                         risk_of_failure = calculate_risk_of_failure(crop, current_temp, yearly_rainfall)
                         score = calculate_score(profitability, risk_of_failure)
 
-                        # Only include crops with non-negative scores
-                        if score > 0:  # Only include crops with positive scores
-                            crops_with_data.append({
-                                'Crop': crop['name'],
-                                'Soil Type': crop['soil_type'],
-                                'Min Temp (°C)': crop['min_temp'],
-                                'Max Temp (°C)': crop['max_temp'],
-                                'Min Rainfall (mm)': crop['min_rainfall'],
-                                'Max Rainfall (mm)': crop['max_rainfall'],
-                                'Profitability': f"{profitability:.2f}",
-                                'Risk of Failure': f"{risk_of_failure:.2f}",
-                                'Score': f"{score:.2f}",
-                            })
+                        # Append to the list of all crops regardless of soil type
+                        all_crops_with_data.append({
+                            'Crop': crop['name'],
+                            'Soil Type': crop['soil_type'],
+                            'Min Temp (°C)': crop['min_temp'],
+                            'Max Temp (°C)': crop['max_temp'],
+                            'Min Rainfall (mm)': crop['min_rainfall'],
+                            'Max Rainfall (mm)': crop['max_rainfall'],
+                            'Profitability': f"{profitability:.2f}",
+                            'Risk of Failure': f"{risk_of_failure:.2f}",
+                            'Score': f"{score:.2f}",
+                        })
+
+                    # Filter crops based on the selected soil type
+                    filtered_crops_with_scores = [
+                        crop for crop in all_crops_with_data if crop['Soil Type'] == soil_type
+                    ]
 
                     # Sort crops by score in descending order
-                    crops_with_data.sort(key=lambda x: x['Score'], reverse=True)
+                    filtered_crops_with_scores.sort(key=lambda x: x['Score'], reverse=True)
 
                     # Create Tabs for different sections
                     tab1, tab2, tab3 = st.tabs(["Crop Details", "Weather Information", "Best Planting Cycle"])
