@@ -1,5 +1,9 @@
 # Arcane
 streamlit
-mysql.connector
+pymysql
 requests
 geopy
+pymysql
+pandas
+numpy 
+matplotlib
