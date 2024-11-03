@@ -116,6 +116,7 @@ def calculate_best_planting_cycle(crops_with_data):
 
     return best_cycles
 
+# Function to load inventory records
 def load_inventory():
     conn = get_connection()
     cursor = conn.cursor()
@@ -123,8 +124,9 @@ def load_inventory():
     inventory = cursor.fetchall()
     cursor.close()
     conn.close()
-    return pd.DataFrame(inventory)
+    return pd.DataFrame(inventory, columns=['id', 'crop_name', 'quantity', 'unit', 'cost_per_unit', 'location', 'notes'])
 
+# Function to insert a new inventory record
 def insert_inventory_record(crop_name, quantity, unit, cost_per_unit, location, notes):
     conn = get_connection()
     try:
@@ -140,6 +142,7 @@ def insert_inventory_record(crop_name, quantity, unit, cost_per_unit, location, 
         cursor.close()
         conn.close()
 
+# Function to delete an inventory record
 def delete_inventory_record(record_id):
     conn = get_connection()
     try:
@@ -252,33 +255,42 @@ def main():
                     plot_crops_scores(crops_with_data)
 
     elif page == "Inventory":
-        st.subheader("Inventory Management")
-        
-        # Display the current inventory
-        inventory_df = load_inventory()
-        st.table(inventory_df)  # Display the inventory in a table format
-        
-        # Insert new record form
-        st.subheader("Add New Record")
-        with st.form("insert_form", clear_on_submit=True):
-            crop_name = st.text_input("Crop Name")
-            quantity = st.number_input("Quantity", min_value=0.0)
-            unit = st.selectbox("Unit", options=["kg", "lbs", "bags"])
-            cost_per_unit = st.number_input("Cost per Unit", min_value=0.0)
-            location = st.text_input("Location")
-            notes = st.text_area("Notes")
-            
-            submitted = st.form_submit_button("Add Record")
-            if submitted:
-                insert_inventory_record(crop_name, quantity, unit, cost_per_unit, location, notes)
-                inventory_df = load_inventory()  # Refresh inventory data
+        # Streamlit app starts here
+        st.title("Inventory Management")
 
-        # Delete record form
-        st.subheader("Delete Record")
-        record_id = st.number_input("Record ID to delete", min_value=1)
-        if st.button("Delete Record"):
-            delete_inventory_record(record_id)
-            inventory_df = load_inventory()  # Refresh inventory data
+        # Load the inventory records
+        if 'inventory' not in st.session_state:
+            st.session_state.inventory = load_inventory()
+
+        # Display the inventory records
+        st.subheader("Current Inventory")
+        df = st.session_state.inventory
+        st.dataframe(df)
+
+        # Inputs for adding a new record
+        st.subheader("Add New Inventory Record")
+        crop_name = st.text_input("Crop Name")
+        quantity = st.number_input("Quantity", min_value=0)
+        unit = st.text_input("Unit")
+        cost_per_unit = st.number_input("Cost per Unit", min_value=0.0, format="%.2f")
+        location = st.text_input("Location")
+        notes = st.text_area("Notes")
+
+        if st.button("Add Record"):
+            insert_inventory_record(crop_name, quantity, unit, cost_per_unit, location, notes)
+            # Reload inventory to refresh the displayed records
+            st.session_state.inventory = load_inventory()
+
+        # Delete functionality
+        if not df.empty:
+            st.subheader("Delete Inventory Record")
+            record_ids = df['id'].tolist()
+            record_to_delete = st.selectbox("Select Record to Delete", options=record_ids, format_func=lambda x: f"{df.loc[df['id'] == x, 'crop_name'].values[0]} (ID: {x})")
+
+            if st.button("Delete Record"):
+                delete_inventory_record(record_to_delete)
+                # Reload inventory to refresh the displayed records
+                st.session_state.inventory = load_inventory()
 
 if __name__ == "__main__":
     main()
